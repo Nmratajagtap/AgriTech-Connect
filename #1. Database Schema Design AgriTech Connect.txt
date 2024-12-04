@@ -1,0 +1,141 @@
+#1. Database Schema Design
+CREATE TABLE users (
+    user_id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role VARCHAR(20) DEFAULT 'farmer',
+    registration_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE products (
+    product_id SERIAL PRIMARY KEY,
+    seller_id INT REFERENCES users(user_id),
+    name VARCHAR(150) NOT NULL,
+    category VARCHAR(50),
+    quality VARCHAR(50),
+    quantity INT CHECK (quantity >= 0),
+    price NUMERIC(10, 2) CHECK (price >= 0),
+    location VARCHAR(255),
+    upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE transactions (
+    transaction_id SERIAL PRIMARY KEY,
+    buyer_id INT REFERENCES users(user_id),
+    seller_id INT REFERENCES users(user_id),
+    product_id INT REFERENCES products(product_id),
+    quantity INT CHECK (quantity > 0),
+    total_price NUMERIC(10, 2) CHECK (total_price > 0),
+    transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE feedback (
+    feedback_id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES users(user_id),
+    product_id INT REFERENCES products(product_id),
+    rating INT CHECK (rating BETWEEN 1 AND 5),
+    comment TEXT,
+    feedback_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+#2. SQL Queries for Key Operations
+#a. Fetch Available Products for Sale
+
+SELECT p.product_id, p.name, p.price, p.quality, p.quantity, u.name AS seller_name, p.location
+FROM products p
+JOIN users u ON p.seller_id = u.user_id
+WHERE p.quantity > 0
+ORDER BY p.upload_date DESC;
+
+#b. Add a New Product
+INSERT INTO products (seller_id, name, category, quality, quantity, price, location) 
+VALUES (1, 'Tomatoes', 'Vegetables', 'A+', 100, 50.00, 'Pune, Maharashtra');
+
+#c. Record a Transaction
+INSERT INTO transactions (buyer_id, seller_id, product_id, quantity, total_price)
+VALUES (2, 1, 10, 20, 1000.00);
+
+#d. View Seller's Product Performance
+SELECT p.name, COUNT(t.transaction_id) AS total_sales, SUM(t.total_price) AS revenue
+FROM products p
+LEFT JOIN transactions t ON p.product_id = t.product_id
+WHERE p.seller_id = 1
+GROUP BY p.name;
+
+#e. Fetch Feedback for a Product
+SELECT f.rating, f.comment, u.name AS user_name
+FROM feedback f
+JOIN users u ON f.user_id = u.user_id
+WHERE f.product_id = 10
+ORDER BY f.feedback_date DESC;
+
+#3. ETL Script Example for Data Cleaning
+-- Remove duplicate user records
+DELETE FROM users
+WHERE user_id NOT IN (
+    SELECT MIN(user_id)
+    FROM users
+    GROUP BY email
+);
+
+-- Normalize product names
+UPDATE products
+SET name = INITCAP(name);
+
+#4. Performance Optimization
+#a. Add Indexes for Faster Queries
+CREATE INDEX idx_products_seller_id ON products(seller_id);
+CREATE INDEX idx_transactions_product_id ON transactions(product_id);
+CREATE INDEX idx_feedback_product_id ON feedback(product_id);
+
+#b. Use Partitioning for Large Tables
+-- Partition transactions table by year
+CREATE TABLE transactions_2024 PARTITION OF transactions
+FOR VALUES FROM ('2024-01-01') TO ('2025-01-01');
+
+#5. SQL for Reporting
+#a. Product Sales Report
+SELECT p.name, COUNT(t.transaction_id) AS sales_count, SUM(t.total_price) AS total_revenue
+FROM products p
+LEFT JOIN transactions t ON p.product_id = t.product_id
+GROUP BY p.name
+ORDER BY total_revenue DESC;
+
+#b. User Registration Trends
+SELECT DATE_TRUNC('month', registration_date) AS month, COUNT(user_id) AS registrations
+FROM users
+GROUP BY month
+ORDER BY month;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
